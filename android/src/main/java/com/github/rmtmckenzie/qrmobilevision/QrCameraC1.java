@@ -9,7 +9,7 @@ import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.WindowManager;
 
-import com.google.mlkit.vision.common.InputImage;
+import com.huawei.hms.mlsdk.common.MLFrame;
 
 import java.io.IOException;
 import java.util.List;
@@ -49,7 +49,7 @@ class QrCameraC1 implements QrCamera {
     }
 
 
-    private int getFirebaseOrientation() {
+    private int getQuadrant() {
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         int deviceRotation = windowManager.getDefaultDisplay().getRotation();
         int rotationCompensation = (ORIENTATIONS.get(deviceRotation) + info.orientation + 270) % 360;
@@ -58,19 +58,19 @@ class QrCameraC1 implements QrCamera {
         int result;
         switch (rotationCompensation) {
             case 0:
-                result = Surface.ROTATION_0;
+                result = MLFrame.SCREEN_FIRST_QUADRANT;
                 break;
             case 90:
-                result = Surface.ROTATION_90;
+                result = MLFrame.SCREEN_SECOND_QUADRANT;
                 break;
             case 180:
-                result = Surface.ROTATION_180;
+                result = MLFrame.SCREEN_THIRD_QUADRANT;
                 break;
             case 270:
-                result = Surface.ROTATION_270;
+                result = MLFrame.SCREEN_FOURTH_QUADRANT;
                 break;
             default:
-                result = Surface.ROTATION_0;
+                result = MLFrame.SCREEN_FIRST_QUADRANT;
                 Log.e(TAG, "Bad rotation value: " + rotationCompensation);
         }
         return result;
@@ -119,7 +119,7 @@ class QrCameraC1 implements QrCamera {
                     if (data != null) {
 
                         QrDetector.Frame frame = new Frame(data,
-                            previewSize.width, previewSize.height, getFirebaseOrientation(), IMAGEFORMAT);
+                            previewSize.width, previewSize.height, getQuadrant(), IMAGEFORMAT);
 
                         detector.detect(frame);
                     } else {
@@ -157,9 +157,17 @@ class QrCameraC1 implements QrCamera {
         }
 
         @Override
-        public InputImage toImage() {
-            //fromByteArray(byte[] byteArray, int width, int height, int rotationDegrees, int format)
-            return InputImage.fromByteArray(data, width, height, rotationDegrees, imageFormat);
+        public MLFrame toImage() {
+            final int format = imageFormat == ImageFormat.NV21
+                ? MLFrame.Property.IMAGE_FORMAT_NV21
+                : MLFrame.Property.IMAGE_FORMAT_YV12;
+            MLFrame.Property property = new MLFrame.Property.Creator()
+                .setWidth(width)
+                .setHeight(height)
+                .setQuadrant(rotationDegrees)
+                .setFormatType(format)
+                .create();
+            return MLFrame.fromByteArray(data, property);
         }
 
         @Override

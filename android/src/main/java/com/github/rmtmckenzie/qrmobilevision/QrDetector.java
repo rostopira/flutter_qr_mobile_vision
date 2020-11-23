@@ -3,15 +3,13 @@ package com.github.rmtmckenzie.qrmobilevision;
 import android.util.Log;
 
 import androidx.annotation.GuardedBy;
-import androidx.annotation.NonNull;
 
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.mlkit.vision.barcode.Barcode;
-import com.google.mlkit.vision.barcode.BarcodeScanner;
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
-import com.google.mlkit.vision.barcode.BarcodeScanning;
-import com.google.mlkit.vision.common.InputImage;
+import com.huawei.hmf.tasks.OnFailureListener;
+import com.huawei.hmf.tasks.OnSuccessListener;
+import com.huawei.hms.ml.scan.HmsScan;
+import com.huawei.hms.ml.scan.HmsScanAnalyzer;
+import com.huawei.hms.ml.scan.HmsScanAnalyzerOptions;
+import com.huawei.hms.mlsdk.common.MLFrame;
 
 import java.util.List;
 
@@ -19,14 +17,13 @@ import java.util.List;
  * Allows QrCamera classes to send frames to a Detector
  */
 
-class QrDetector implements OnSuccessListener<List<Barcode>>, OnFailureListener {
+class QrDetector implements OnSuccessListener<List<HmsScan>>, OnFailureListener {
     private static final String TAG = "cgr.qrmv.QrDetector";
     private final QrReaderCallbacks communicator;
-    private final BarcodeScanner detector;
+    private final HmsScanAnalyzer detector;
 
     public interface Frame {
-        InputImage toImage();
-
+        MLFrame toImage();
         void close();
     }
 
@@ -36,9 +33,9 @@ class QrDetector implements OnSuccessListener<List<Barcode>>, OnFailureListener 
     @GuardedBy("this")
     private Frame processingFrame;
 
-    QrDetector(QrReaderCallbacks communicator, BarcodeScannerOptions options) {
+    QrDetector(QrReaderCallbacks communicator, HmsScanAnalyzerOptions options) {
         this.communicator = communicator;
-        this.detector = BarcodeScanning.getClient(options);
+        this.detector = new HmsScanAnalyzer(options);
     }
 
     void detect(Frame frame) {
@@ -59,31 +56,22 @@ class QrDetector implements OnSuccessListener<List<Barcode>>, OnFailureListener 
         }
     }
 
-    private void processFrame(Frame frame) {
-        InputImage image;
-        try {
-            image = frame.toImage();
-        } catch (IllegalStateException ex) {
-            // ignore state exception from making frame to image
-            // as the image may be closed already.
-            return;
-        }
-
-        detector.process(image)
+    private void processFrame(Frame image) {
+        detector.analyzInAsyn(image.toImage())
             .addOnSuccessListener(this)
             .addOnFailureListener(this);
     }
 
     @Override
-    public void onSuccess(List<Barcode> firebaseVisionBarcodes) {
-        for (Barcode barcode : firebaseVisionBarcodes) {
-            communicator.qrRead(barcode.getRawValue());
+    public void onSuccess(List<HmsScan> hmsScans) {
+        for (HmsScan barcode : hmsScans) {
+            communicator.qrRead(barcode.originalValue);
         }
         processLatest();
     }
 
     @Override
-    public void onFailure(@NonNull Exception e) {
+    public void onFailure(Exception e) {
         Log.w(TAG, "Barcode Reading Failure: ", e);
     }
 }

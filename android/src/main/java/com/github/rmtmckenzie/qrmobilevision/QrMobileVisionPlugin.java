@@ -3,13 +3,13 @@ package com.github.rmtmckenzie.qrmobilevision;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
 
-
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
+import com.huawei.hms.ml.scan.HmsScan;
+import com.huawei.hms.ml.scan.HmsScanAnalyzerOptions;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -147,6 +147,41 @@ public class QrMobileVisionPlugin implements MethodCallHandler, QrReaderCallback
         lastHeartbeatTimeout = null;
     }
 
+    static private HmsScanAnalyzerOptions optionsFromStringList(List<String> formatStrings) {
+        HmsScanAnalyzerOptions.Creator creator = new HmsScanAnalyzerOptions.Creator();
+        List<Integer> scanTypes = new ArrayList<>();
+        for (String format : formatStrings) {
+            switch (format) {
+                case "ALL_FORMATS":
+                    creator.setHmsScanTypes(HmsScan.ALL_SCAN_TYPE);
+                    return creator.create();
+                case "AZTEC": scanTypes.add(HmsScan.AZTEC_SCAN_TYPE); break;
+                case "CODE_128": scanTypes.add(HmsScan.CODE128_SCAN_TYPE); break;
+                case "CODE_39": scanTypes.add(HmsScan.CODE39_SCAN_TYPE); break;
+                case "CODE_93": scanTypes.add(HmsScan.CODE93_SCAN_TYPE); break;
+                case "CODABAR": scanTypes.add(HmsScan.CODABAR_SCAN_TYPE); break;
+                case "DATA_MATRIX": scanTypes.add(HmsScan.DATAMATRIX_SCAN_TYPE); break;
+                case "EAN_13": scanTypes.add(HmsScan.EAN13_SCAN_TYPE); break;
+                case "EAN_8": scanTypes.add(HmsScan.EAN8_SCAN_TYPE); break;
+                case "ITF": scanTypes.add(HmsScan.ITF14_SCAN_TYPE); break;
+                case "PDF417": scanTypes.add(HmsScan.PDF417_SCAN_TYPE); break;
+                case "QR_CODE": scanTypes.add(HmsScan.QRCODE_SCAN_TYPE); break;
+                case "UPC_A": scanTypes.add(HmsScan.UPCCODE_A_SCAN_TYPE); break;
+                case "UPC_E": scanTypes.add(HmsScan.UPCCODE_E_SCAN_TYPE); break;
+            }
+        }
+        if (scanTypes.size() > 1) {
+            int[] scanTypesArray = new int[scanTypes.size() - 1];
+            for (int i = 1; i < scanTypes.size(); i++) {
+                scanTypesArray[i] = scanTypes.get(i);
+            }
+            creator.setHmsScanTypes(scanTypes.get(0), scanTypesArray);
+        } else {
+            creator.setHmsScanTypes(scanTypes.get(0));
+        }
+        return creator.create();
+    }
+
     @Override
     public void onMethodCall(MethodCall methodCall, Result result) {
         switch (methodCall.method) {
@@ -167,7 +202,7 @@ public class QrMobileVisionPlugin implements MethodCallHandler, QrReaderCallback
                         break;
                     }
 
-                    BarcodeScannerOptions options = BarcodeFormats.optionsFromStringList(formatStrings);
+                    HmsScanAnalyzerOptions options = optionsFromStringList(formatStrings);
 
                     TextureRegistry.SurfaceTextureEntry textureEntry = textures.createSurfaceTexture();
                     QrReader reader = new QrReader(targetWidth, targetHeight, activity, options,
@@ -186,7 +221,8 @@ public class QrMobileVisionPlugin implements MethodCallHandler, QrReaderCallback
                         result.error(e.reason().name(), "Error starting camera for reason: " + e.reason().name(), null);
                     } catch (NoPermissionException e) {
                         waitingForPermissionResult = true;
-                        ActivityCompat.requestPermissions(activity,
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                        activity.requestPermissions(
                             new String[]{Manifest.permission.CAMERA}, REQUEST_PERMISSION);
                     }
                 }

@@ -24,7 +24,7 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
-import com.google.mlkit.vision.common.InputImage;
+import com.huawei.hms.mlsdk.common.MLFrame;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -92,7 +92,7 @@ class QrCameraC2 implements QrCamera {
         return sensorOrientation == 270 ? 90 : sensorOrientation;
     }
 
-    private int getFirebaseOrientation() {
+    private int getQuadrant() {
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         int deviceRotation = windowManager.getDefaultDisplay().getRotation();
         int rotationCompensation = (ORIENTATIONS.get(deviceRotation) + sensorOrientation + 270) % 360;
@@ -101,19 +101,19 @@ class QrCameraC2 implements QrCamera {
         int result;
         switch (rotationCompensation) {
             case 0:
-                result = Surface.ROTATION_0;
+                result = MLFrame.SCREEN_FIRST_QUADRANT;
                 break;
             case 90:
-                result = Surface.ROTATION_90;
+                result = MLFrame.SCREEN_SECOND_QUADRANT;
                 break;
             case 180:
-                result = Surface.ROTATION_180;
+                result = MLFrame.SCREEN_THIRD_QUADRANT;
                 break;
             case 270:
-                result = Surface.ROTATION_270;
+                result = MLFrame.SCREEN_FOURTH_QUADRANT;
                 break;
             default:
-                result = Surface.ROTATION_0;
+                result = MLFrame.SCREEN_FIRST_QUADRANT;
                 Log.e(TAG, "Bad rotation value: " + rotationCompensation);
         }
         return result;
@@ -203,16 +203,16 @@ class QrCameraC2 implements QrCamera {
 
     static class Frame implements QrDetector.Frame {
         final Image image;
-        final int firebaseOrientation;
+        final int quadrant;
 
-        Frame(Image image, int firebaseOrientation) {
+        Frame(Image image, int quadrant) {
             this.image = image;
-            this.firebaseOrientation = firebaseOrientation;
+            this.quadrant = quadrant;
         }
 
         @Override
-        public InputImage toImage() {
-            return InputImage.fromMediaImage(image, firebaseOrientation);
+        public MLFrame toImage() {
+            return MLFrame.fromMediaImage(image, quadrant);
         }
 
         @Override
@@ -238,7 +238,7 @@ class QrCameraC2 implements QrCamera {
                 try {
                     Image image = reader.acquireLatestImage();
                     if (image == null) return;
-                    latestFrame = new Frame(image, getFirebaseOrientation());
+                    latestFrame = new Frame(image, getQuadrant());
                     detector.detect(latestFrame);
                 } catch (Throwable t) {
                     t.printStackTrace();
